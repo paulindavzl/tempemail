@@ -1,15 +1,25 @@
+import time
+import string
+import random as rd
 from typing import Optional
 
-from ..core import utils
 from ..core.env_handler import EnvHandler
+from ..core.messeger import DEFAULT_NAME
 
 
 _ENV = EnvHandler.unique()
 
 
+_LETTERS = list(string.ascii_letters)
+_NUMBERS = list(string.digits)
+_CHARS = _LETTERS + _NUMBERS
+
+
 class UserModel:
+    __slots__ = ["name", "email"]
+
     def __init__(self, name: Optional[str]=None, email: Optional[str]=None):
-        self.temp_name = name if name is not None else utils.gen_anonymous_name()
+        self.temp_name = name if name is not None else self._gen_anonymous_name()
         self.temp_email = email if email is not None else self._get_email()
 
 
@@ -18,6 +28,17 @@ class UserModel:
 
         return email
     
+
+    def _gen_anonymous_name(name: str=DEFAULT_NAME, add_time: bool=True, ranger: int=10) -> str:
+        name += "_"
+        for _ in range(ranger):
+            name += str(rd.choice(_CHARS))
+
+        if add_time:
+            name += f"_{time.time()}"
+
+        return name
+        
 
     def copy(self) -> "UserModel":
         return UserModel(**self.to_dict)

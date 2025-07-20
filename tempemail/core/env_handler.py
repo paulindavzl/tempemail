@@ -3,7 +3,7 @@ import dotenv
 from typing import TypeVar
 
 from . import utils
-from .controller import (
+from .messeger import (
     MISSING_VARIABLE
 )
 

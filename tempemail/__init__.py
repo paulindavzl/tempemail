@@ -5,7 +5,8 @@ from .core.email_handler import EmailHandler
 from .core.utils import (
     Path, 
     is_valid_email_in,
-    parse_message
+    parse_message, 
+    get_email_from
 )
 
 
@@ -17,5 +18,6 @@ __all__ = [
     "Email",
     "Path",
     "is_valid_email_in",
-    "parse_message"
+    "parse_message",
+    "get_email_from"
 ]

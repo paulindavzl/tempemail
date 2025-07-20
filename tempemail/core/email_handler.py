@@ -11,7 +11,7 @@ import email as _email
 from aiosmtpd.smtp import Envelope
 from email.message import EmailMessage
 from aiosmtpd.controller import Controller
-from email.utils import formataddr, formatdate
+from email.utils import formatdate
 from typing import Optional, overload, AsyncGenerator
 
 from .env_handler import EnvHandler
@@ -19,11 +19,9 @@ from ..models.email_data import Email
 from .utils import (
     Path,
     parse_message, 
-    get_filename,
     get_email_hash,
-    parse_path
 )
-from .controller import (
+from .messeger import (
     WAIT_EMAIL_COOLDOWN,
     RECEIVER_OFF,
     PATH_ARE_NOT_DEFINED,
@@ -173,7 +171,7 @@ class EmailHandler:
         for att_name, path in attachments.items():
             if path:
                 path = Path(path)
-                mime_type, _ = mimetypes.guess_type(path)
+                mime_type, _ = mimetypes.guess_type(str(path))
                 mime_type = mime_type or "application/octet-stream"
                 main_type, sub_type = mime_type.split("/")
                 
@@ -329,15 +327,15 @@ class EmailHandler:
     def _save(self, email: Email):
         if not self.path:
             raise ValueError(PATH_ARE_NOT_DEFINED)
-        
-        dest = get_filename("".join(email.destination))
-        
+                
         self.path.mkdir(True)
 
-        email_path = self.path.join(dest.lower())
+        email_path = self.path.get_non_existent_name("".join(email.destination))
+        email_path.parser(full=False)
         email_path.mkdir(True)
 
-        subject_path = email_path.get_not_existent_name(get_filename(email.subject))
+        subject_path = email_path.get_non_existent_name(email.subject)
+        subject_path.parser(full=False)
         subject_path.mkdir(True)
 
         content_path = subject_path.join("content" + self.extension)
@@ -361,7 +359,7 @@ class EmailHandler:
                 ext = mimetypes.guess_extension(data["content_type"]) or ".bin"
                 att_name += ext
 
-                att_path = subject_path.join(att_name)
+                att_path = subject_path.get_non_existent_name(att_name)
                 with att_path.file("wb", True) as att_file:
                     att_file.write(data["payload"])
 

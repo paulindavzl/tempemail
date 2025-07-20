@@ -1,7 +1,7 @@
 import hashlib
 from typing import Literal, Optional
 
-from .user_model import UserModel
+from ..core.types import UserModel
 
 
 class Email:
