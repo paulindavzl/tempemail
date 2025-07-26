@@ -24,7 +24,7 @@ METADATA: typing.TypeAlias =  dict[typing.Literal[
 ], str|int]
 
 
-def parse_message(message: str, **replace: str) -> str:
+def parse_message(message: str, complement: typing.Optional[str]=None, **replace: str) -> str:
     """
     (USO INTERNO) modifica mensagens especiais, trocando TAGS por palavras/frases.
 
@@ -46,6 +46,9 @@ def parse_message(message: str, **replace: str) -> str:
         raise 
     for tag, value in replace.items():
         message = message.replace(f"<{tag}>", str(value))
+
+    complement = "" if complement is None else complement
+    message = message.replace(" <COMPLEMENT>", complement)
 
     return message
 
@@ -494,6 +497,107 @@ class Path:
         return Path(path + ext if ext else "")
     
 
+    @typing.overload
+    def is_type(self, /) -> typing.Literal["directory", "file"]: ...
+
+    @typing.overload
+    def is_type(self, expected: typing.Literal["directory", "file"]) -> bool: ...
+
+    def is_type(self, expected: typing.Literal["directory", "file"]=None) -> bool|typing.Literal["directory", "file"]:
+        typ = "directory" if os.path.isdir(str(self)) else "file"
+            
+        return typ == expected if expected else typ
+
+    
+    @typing.overload
+    def remove(self, non_existent_ok: bool, /): ...
+
+    @typing.overload
+    def remove(self, non_existent_ok: bool, ignore: typing.Optional[list[str]]): ...
+
+    def remove(self, non_existent_ok: bool=False, ignore: typing.Optional[list[str]]=None):
+        """
+        apaga o componente representado (arquivo ou diretório).
+
+        ### parâmetros:
+
+            non_existent_ok (bool): quando False, caso o componente não exista gera um erro (FileNotFoundException)
+            ignore (list[str]): caminho dos componentes que devem ser ignorados. caso um diretório seja ignorado, todos seus componentes também serão
+
+        ### uso:
+
+            '''
+            exemplo de estrutura de arquivos antes de Path.remove(...):
+
+            ./
+                project_name/
+                    directory/
+                        directory_file.txt
+                        sub_directory_1/
+                            sub_directory_1_file_1.txt
+                            sub_directory_1_file_2.txt
+                        sub_directory_2/
+                            sub_directory_2_file_1.txt
+                            sub_directory_2_file_2.txt
+            '''
+
+            path = Path(".", "project_name", "directory")
+
+            path.remove(
+                non_existent_ok=True,
+                ignore=[sub_directory_1_file_2.txt]
+            )
+
+            '''
+            exemplo de estrutura de arquivos antes de Path.remove(...):
+
+            ./
+                project_name/
+                    directory/
+                        sub_directory_1/
+                            sub_directory_1_file_2.txt
+            '''
+
+        ### observação:
+
+            - caso use ignore, automaticamente o diretório que armazena o componente ignorado também será ignorado!
+        """
+
+        def _ignore_item(path: Path) -> bool:
+            item_name = str(path).replace(str(self), self.name)
+            return item_name in ignore
+
+        def _remove_items(path: Path):
+            if _ignore_item(path):
+                return
+            
+            for item in path.items():
+                if _ignore_item(item):
+                    continue
+
+                if item.is_type("directory"):
+                    if len(item.items()):
+                        _remove_items(item)
+                    
+                    os.removedirs(str(item))
+                else:
+                    os.remove(str(item))
+        
+        directory = self.is_type("directory")
+        if not self.exists:
+            if non_existent_ok:
+                return
+            raise FileNotFoundException(parse_message(FILE_NOT_FOUND, PATH=str(self)))
+        elif ignore and not directory:
+            raise NotADirectoryError(parse_message(NOT_DIRECTORY, PATH=self, complement='Do not use "ignore" to remove files.'))
+        
+        if directory:
+            for item in self.items():
+                _remove_items(item) if item.is_type("directory") else os.remove(str(item))
+        else:
+            os.remove(str(self))
+
+
     @property
     def name(self) -> str:
         """
@@ -514,3 +618,4 @@ class Path:
 
     def __repr__(self) -> typing.Literal['<Path: "<path>">']:
         return f'<Path: "{str(self)}">'
+    

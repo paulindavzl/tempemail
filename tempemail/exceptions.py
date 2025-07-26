@@ -5,5 +5,14 @@ class FileNotFoundException(Exception):
 class InvalidEmailException(Exception):
     """e-mail inválido"""
 
-class InvalidContent(Exception):
+
+class InvalidContentException(Exception):
     """conteúdo inválido"""
+
+
+class EnvironmentVariableRequiredException(Exception):
+    """variável de ambiente obrigatória ausente"""
+
+
+class EmptyEnvfileException(Exception):
+    """parâmetro envfile vazio (None)"""

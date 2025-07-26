@@ -14,7 +14,6 @@ __all__ = [
     "EmailHandler", 
     "EnvHandler", 
     "UserModel", 
-    "Email", 
     "Email",
     "Path",
     "is_valid_email_in",

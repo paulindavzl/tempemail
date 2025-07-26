@@ -7,7 +7,7 @@ from ..core.env_handler import EnvHandler
 from ..core.messeger import DEFAULT_NAME
 
 
-_ENV = EnvHandler.unique()
+_ENV: EnvHandler
 
 
 _LETTERS = list(string.ascii_letters)
@@ -18,7 +18,18 @@ _CHARS = _LETTERS + _NUMBERS
 class UserModel:
     __slots__ = ["name", "email"]
 
-    def __init__(self, name: Optional[str]=None, email: Optional[str]=None):
+    def __init__(self, env: str|EnvHandler, name: Optional[str]=None, email: Optional[str]=None):
+        """
+        modelo do usuário.
+
+        ### parâmetros:
+
+            env (str|EnvHandler): caminho para o arquivo ou instância do manipulador de variáveis de ambiente
+            name (Optional[str]): nome do usuário
+            email (Optional[str]): e-mail do usuário
+        """
+        _ENV = EnvHandler.unique(env) if isinstance(env, str) else env
+
         self.temp_name = name if name is not None else self._gen_anonymous_name()
         self.temp_email = email if email is not None else self._get_email()
 

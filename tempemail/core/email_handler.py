@@ -29,7 +29,7 @@ from .messeger import (
 )
 
 
-_ENV = EnvHandler.unique()
+_ENV: EnvHandler
 
 
 class _Handler:
@@ -108,7 +108,16 @@ class EmailHandler:
     extension: Optional[str]
 
 
-    def __init__(self):
+    def __init__(self, env: str|EnvHandler):
+        """
+        manipula o envio, recebimento e salvamento de e-mails.
+
+        ### parâmetros:
+
+            env (str|EnvHandler): caminho para o arquivo ou instância do manipulador de variáveis de ambiente
+        """
+        _ENV = EnvHandler.unique(env) if isinstance(env, str) else env
+        
         self.path = None
         self._handler = _Handler()
         self._controller = Controller(self._handler, _ENV.SERVER, _ENV.PORT)
