@@ -1,4 +1,4 @@
-class FileNotFoundException(Exception):
+class PathNotFoundException(Exception):
     """arquivo não encontrado"""
 
 
@@ -16,3 +16,7 @@ class EnvironmentVariableRequiredException(Exception):
 
 class EmptyEnvfileException(Exception):
     """parâmetro envfile vazio (None)"""
+
+
+class NotDirectoryException(Exception):
+    """o caminho não leva à um diretório"""

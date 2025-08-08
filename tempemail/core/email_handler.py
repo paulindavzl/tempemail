@@ -16,6 +16,7 @@ from typing import Optional, overload, AsyncGenerator
 
 from .env_handler import EnvHandler
 from ..models.email_data import Email
+from ..exceptions import *
 from .utils import (
     Path,
     parse_message, 
@@ -25,7 +26,7 @@ from .messeger import (
     WAIT_EMAIL_COOLDOWN,
     RECEIVER_OFF,
     PATH_ARE_NOT_DEFINED,
-    FILE_NOT_FOUND
+    PATH_NOT_FOUND
 )
 
 
@@ -185,7 +186,7 @@ class EmailHandler:
                 main_type, sub_type = mime_type.split("/")
                 
                 if not path.exists():
-                    raise FileNotFoundError(parse_message(FILE_NOT_FOUND, PATH=path))
+                    raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=path, TYPE="attachment"))
 
                 with path.file("rb") as file:        
                     content = file.read()
@@ -339,11 +340,11 @@ class EmailHandler:
                 
         self.path.mkdir(True)
 
-        email_path = self.path.get_non_existent_name("".join(email.destination))
+        email_path = self.path.free_name("".join(email.destination))
         email_path.parser(full=False)
         email_path.mkdir(True)
 
-        subject_path = email_path.get_non_existent_name(email.subject)
+        subject_path = email_path.free_name(email.subject)
         subject_path.parser(full=False)
         subject_path.mkdir(True)
 
@@ -368,7 +369,7 @@ class EmailHandler:
                 ext = mimetypes.guess_extension(data["content_type"]) or ".bin"
                 att_name += ext
 
-                att_path = subject_path.get_non_existent_name(att_name)
+                att_path = subject_path.free_name(att_name)
                 with att_path.file("wb", True) as att_file:
                     att_file.write(data["payload"])
 

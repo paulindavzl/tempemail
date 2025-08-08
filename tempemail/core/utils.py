@@ -5,11 +5,12 @@ import typing
 import hashlib
 import mimetypes
 import jsonschema
+from io import TextIOWrapper
 
 from ..models.email_data import Email
 from ..exceptions import *
 from .messeger import (
-    FILE_NOT_FOUND,
+    PATH_NOT_FOUND,
     NOT_DIRECTORY,
     NOT_FILE,
     DIRECTORY_ALREADY_EXISTS,
@@ -24,6 +25,13 @@ METADATA: typing.TypeAlias =  dict[typing.Literal[
 ], str|int]
 
 
+__all__ = [
+    "Path",
+    "is_valid_email_in",
+    "parse_message",
+    "get_email_from"
+]
+
 def parse_message(message: str, complement: typing.Optional[str]=None, **replace: str) -> str:
     """
     (USO INTERNO) modifica mensagens especiais, trocando TAGS por palavras/frases.
@@ -31,15 +39,16 @@ def parse_message(message: str, complement: typing.Optional[str]=None, **replace
     ### parâmetros:
 
         message (str): mensagem especial contendo <TAGS>
+        complement (Optional[str]): complemento da mensagem
         **replace (dict[str, str]): nome das <TAGS> e suas substituições
 
     ### uso:
 
-        from tempemail.core.messeger import FILE_NOT_FOUND
+        from tempemail.core.messeger import PATH_NOT_FOUND
 
-        print(FILE_NOT_FOUND) # "the file <PATH> was not found!"
+        print(PATH_NOT_FOUND) # "the <TYPE> <PATH> was not found! <COMPLEMENT>"
 
-        parsed_message(FILE_NOT_FOUND, PATH="./file.txt")
+        parsed_message(PATH_NOT_FOUND, PATH="./file.txt", TYPE="file")
         print(parsed_message) # "the file ./file.txt was not found!"
     """
     if not "<" in message or not ">" in message:
@@ -86,7 +95,7 @@ def get_email_from(path: "Path") -> "Email":
         print(email.sender) # "sender@exemplo.com"
     """
     if not path.exists:
-        raise FileNotFoundException(parse_message(FILE_NOT_FOUND, PATH=str(path)))
+        raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(path), TYPE="email"))
     elif not is_valid_email_in(path):
         raise InvalidEmailException(parse_message(INVALID_EMAIL, PATH=str(path)))
         
@@ -153,7 +162,7 @@ def is_valid_email_in(path: "Path") -> bool:
     """
 
     if not path.exists:
-        raise FileNotFoundException(parse_message(FILE_NOT_FOUND, PATH=str(path)))
+        raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(path), TYPE="email"))
     
     meta = path.join("metadata.json")
     metadata: dict
@@ -214,7 +223,9 @@ class Path:
 
         def mkdir(self, exists_ok: bool=False): cria todos os arquivos do caminho representado caso não existam
 
-        def get_non_existent_name(self, *paths) -> Path: adiciona um componente ao caminho representado com um nome novo, evitando conflitos com arquivos já existentes.
+        def remove(self, non_existent_ok: bool=False, ignore: typing.Optional[list[tuple[str]]]=None): apaga o componente representado (arquivo ou diretório)
+
+        def free_name(self, *paths) -> Path: adiciona um componente ao caminho representado com um nome novo, evitando conflitos com arquivos já existentes.
 
         @property
         def name(self) -> str: retorna o nome do diretório ou arquivo representado
@@ -254,7 +265,7 @@ class Path:
     def parser(self, /, full: bool=True) -> "Path": ...
 
     @typing.overload
-    def parser(self, in_self: bool, full: bool=True) -> typing.Optional["Path"]: ...
+    def parser(self, in_self: bool, full: bool=True) -> None: ...
 
     def parser(self, in_self: bool=False, full: bool=True) -> typing.Optional["Path"]:
         """
@@ -300,7 +311,7 @@ class Path:
     def join(self, /, *paths: str) -> "Path": ...
 
     @typing.overload
-    def join(self, in_self: bool, *paths: str) -> "Path": ...
+    def join(self, in_self: bool, *paths: str) -> None: ...
 
     def join(self, *paths: str, **param: bool) -> "Path":
         """
@@ -347,7 +358,7 @@ class Path:
         return os.path.exists(str(self))
     
 
-    def file(self, mode: _OPEN_TEXT_MODE="r", non_existent_ok: bool=False) -> typing.TextIO:
+    def file(self, mode: _OPEN_TEXT_MODE="r", non_existent_ok: bool=False) -> TextIOWrapper:
         """
         abre um arquivo e retorna-o, possibilitando manipulação.
 
@@ -363,14 +374,13 @@ class Path:
             with path.file("w") as file:
                 file.write("exemplo")
         """
-        if not self.exists and not non_existent_ok:
-            raise FileNotFoundException(parse_message(FILE_NOT_FOUND, PATH=str(self)))
+        if not self.exists:
+            if not non_existent_ok:
+                raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(self), TYPE="file"))
         elif not os.path.isfile(str(self)):
             raise NotADirectoryError(parse_message(NOT_FILE, PATH=str(self)))
         
-        file = open(str(self), mode)
-
-        return file
+        return open(str(self), mode)
     
 
     @typing.overload
@@ -404,10 +414,12 @@ class Path:
             for file in files:
                 print(file.name) # "file1.txt" / "file2.txt"
         """
-        if not os.path.isdir(str(self)):
+        if not self.exists:
+            raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=self, TYPE="directory"))
+        elif not self.is_type("directory"):
             raise NotADirectoryError(parse_message(NOT_DIRECTORY, PATH=self))
         
-        items_name = os.listdir(self._path)
+        items_name = os.listdir(str(self))
         items = []
         for item_name in items_name:
             if ignore and item_name in ignore:
@@ -460,7 +472,7 @@ class Path:
             os.makedirs(path, exist_ok=exists_ok)
         
 
-    def get_non_existent_name(self, *paths) -> "Path":
+    def free_name(self, *paths) -> "Path":
         """
         adiciona um componente ao caminho representado com um nome novo, evitando conflitos com arquivos já existentes.
 
@@ -475,26 +487,28 @@ class Path:
             file1 = path.join("file.txt") # adiciona outro componente no caminho
             print(file1) # "./project_name/directory/file.txt"
 
-            file2 = path.get_non_existent_name("file.txt",) # adiciona outro componente com o mesmo nome de um componente já existente
+            file2 = path.free_name("file.txt",) # adiciona outro componente com o mesmo nome de um componente já existente
             print(file2) # "./project_name/directory/file_0.txt"
         """
         paths = [str(self)] + Path._parse_path(paths)
-        path = os.path.join(*paths)
+        path = Path(*paths)
 
-        ext = ""
-        if not os.path.isdir(path):
-            points = path.split(".")
-            ext = "." + points[-1]
+        if path.exists:
+            ext = ""
+            if path.is_type("file"):
+                if "." in path.name:
+                    ext = "." + path.name.split(".")[-1]
+            
+            counter = 2
+            name = path.name[:-len(ext)] if ext else path.name
+            while path.exists:
+                name += f"_{counter}"
 
-            path = path.replace(ext, "")
+                path._paths[-1] = name + ext
+            
+            return path
 
-        rounder = 0
-        while os.path.exists(path + ext if ext else ""):
-            path += f"_{rounder}"
-
-            rounder += 1
-
-        return Path(path + ext if ext else "")
+        return path
     
 
     @typing.overload
@@ -504,6 +518,10 @@ class Path:
     def is_type(self, expected: typing.Literal["directory", "file"]) -> bool: ...
 
     def is_type(self, expected: typing.Literal["directory", "file"]=None) -> bool|typing.Literal["directory", "file"]:
+        if not self.exists:
+            if expected is None:
+                raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(self), TYPE="path"))
+            return False
         typ = "directory" if os.path.isdir(str(self)) else "file"
             
         return typ == expected if expected else typ
@@ -515,13 +533,13 @@ class Path:
     @typing.overload
     def remove(self, non_existent_ok: bool, ignore: typing.Optional[list[str]]): ...
 
-    def remove(self, non_existent_ok: bool=False, ignore: typing.Optional[list[str]]=None):
+    def remove(self, non_existent_ok: bool=False, ignore: typing.Optional[list[tuple[str]]]=None, x=None):
         """
         apaga o componente representado (arquivo ou diretório).
 
         ### parâmetros:
 
-            non_existent_ok (bool): quando False, caso o componente não exista gera um erro (FileNotFoundException)
+            non_existent_ok (bool): quando False, caso o componente não exista gera um erro (PathNotFoundException)
             ignore (list[str]): caminho dos componentes que devem ser ignorados. caso um diretório seja ignorado, todos seus componentes também serão
 
         ### uso:
@@ -545,7 +563,7 @@ class Path:
 
             path.remove(
                 non_existent_ok=True,
-                ignore=[sub_directory_1_file_2.txt]
+                ignore=[("sub_directory_1", "sub_directory_1_file_2.txt")]
             )
 
             '''
@@ -562,40 +580,41 @@ class Path:
 
             - caso use ignore, automaticamente o diretório que armazena o componente ignorado também será ignorado!
         """
+        if not self.exists and not non_existent_ok:
+            raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=self, TYPE="path"))
+        elif ignore and self.is_type("file"):
+            raise NotDirectoryException(parse_message(NOT_DIRECTORY, complement="use ignore only when removing directories.", PATH=self))
+        
+        ignore_parsed = [
+            os.path.join(*comps) if isinstance(comps, (tuple, list)) else comps for comps in ignore
+        ] if ignore else []
 
+        def _relative_name(path: Path) -> str:
+            return str(path).replace(str(self), self.name)
+        
         def _ignore_item(path: Path) -> bool:
-            item_name = str(path).replace(str(self), self.name)
-            return item_name in ignore
+            if _relative_name(path) in ignore_parsed:
+                ignore_parsed.append(self.name) if self.name not in ignore_parsed else None
+                return True
+            return False
+                
+        def _remover(path: Path, base: typing.Optional[str]=None):            
+            if path.is_type("directory"):
+                if _ignore_item(path):
+                    if base:
+                        ignore_parsed.append(base)
+                
+                for item in path.items():
+                    _remover(item, _relative_name(path))
 
-        def _remove_items(path: Path):
-            if _ignore_item(path):
-                return
-            
-            for item in path.items():
-                if _ignore_item(item):
-                    continue
+                if path.exists and not _ignore_item(path):
+                    os.removedirs(str(path))
 
-                if item.is_type("directory"):
-                    if len(item.items()):
-                        _remove_items(item)
-                    
-                    os.removedirs(str(item))
-                else:
-                    os.remove(str(item))
-        
-        directory = self.is_type("directory")
-        if not self.exists:
-            if non_existent_ok:
-                return
-            raise FileNotFoundException(parse_message(FILE_NOT_FOUND, PATH=str(self)))
-        elif ignore and not directory:
-            raise NotADirectoryError(parse_message(NOT_DIRECTORY, PATH=self, complement='Do not use "ignore" to remove files.'))
-        
-        if directory:
-            for item in self.items():
-                _remove_items(item) if item.is_type("directory") else os.remove(str(item))
-        else:
-            os.remove(str(self))
+            else:
+                if path.exists:
+                    os.remove(str(path))
+
+        _remover(self)
 
 
     @property

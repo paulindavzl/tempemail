@@ -1,7 +1,7 @@
 WAIT_EMAIL_COOLDOWN = 0.2
 DEFAULT_NAME = "anonymous"
 MISSING_VARIABLE = "the <NAME> variable does not exist! <COMPLEMENT>"
-FILE_NOT_FOUND = "the file <PATH> was not found! <COMPLEMENT>"
+PATH_NOT_FOUND = "the <TYPE> <PATH> was not found! <COMPLEMENT>"
 PATH_ARE_NOT_DEFINED = "the path to save emails is not defined! use Receiver().save_in(...) to define a path."
 NOT_DIRECTORY = "the path <PATH> does not point to a directory! <COMPLEMENT>"
 NOT_FILE = "the path <PATH> does not point to a file! <COMPLEMENT>"
