@@ -11,6 +11,9 @@ INVALID_EMAIL = f'the email in "<PATH>" is invalid! <COMPLEMENT>'
 TESTS_INTERRUPTED = "tests interrupted by user!"
 TESTS_PATH = "tests_tempemail"
 EMPTY_ENVFILE = "envfile not provided (None)! Please provide an envfile."
+STATUS_250 = "250 FULL-SUCCESSFUL"
+STATUS_200 = "200 OK"
+STATUS_500 = "500 REFUSED"
 
 _METADATA_SCHEME_JSON = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -1,6 +1,5 @@
 import os
 import re
-import pytest
 from io import TextIOWrapper
 
 from tempemail.core.utils import *

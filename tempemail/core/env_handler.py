@@ -250,3 +250,5 @@ class EnvHandler:
         return instance
         
         
+    def __str__(self):
+        return self._envfile

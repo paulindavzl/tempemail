@@ -190,7 +190,9 @@ def is_valid_email_in(path: "Path") -> bool:
     extension: str = metadata["extension"]
 
     content_path = path.join("content" + extension)
-    content: str = content_path.file()
+    content: str
+    with content_path.file() as content_file:
+        content = content_file.read()
 
     sha = hashlib.sha256(str("".join([
         str(metadata.get("subject", "")).strip().lower(),
@@ -292,7 +294,7 @@ class Path:
         new_components = []
         for comp in components:
             comp = re.sub(
-                r"[^\w\-_\.]",
+                r"[^\w\-_/\\.]",
                 "_",
                 comp
             )
@@ -311,7 +313,7 @@ class Path:
     def join(self, /, *paths: str) -> "Path": ...
 
     @typing.overload
-    def join(self, in_self: bool, *paths: str) -> None: ...
+    def join(self, in_self: bool, *paths: str) -> "Path": ...
 
     def join(self, *paths: str, **param: bool) -> "Path":
         """
@@ -472,12 +474,19 @@ class Path:
             os.makedirs(path, exist_ok=exists_ok)
         
 
-    def free_name(self, *paths) -> "Path":
+    @typing.overload
+    def free_name(self, /, *paths) -> "Path": ...
+
+    @typing.overload
+    def free_name(self, parser: bool, *paths) -> "Path": ...
+
+    def free_name(self, *paths, **kwargs) -> "Path":
         """
         adiciona um componente ao caminho representado com um nome novo, evitando conflitos com arquivos já existentes.
 
         ### parâmetros:
 
+            parser (bool): remove caractéres do nome dos componentes que possa causar problemas
             paths (tuple[str]): nomes dos componentes que serão adicionados no caminho já salvo
 
         ### uso:
@@ -493,6 +502,10 @@ class Path:
         paths = [str(self)] + Path._parse_path(paths)
         path = Path(*paths)
 
+        parser = kwargs.get("parser", False)
+        if parser:
+            path.parser(in_self=True, full=False)
+
         if path.exists:
             ext = ""
             if path.is_type("file"):
@@ -505,6 +518,7 @@ class Path:
                 name += f"_{counter}"
 
                 path._paths[-1] = name + ext
+                path.parser(in_self=True, full=False)
             
             return path
 
@@ -638,3 +652,16 @@ class Path:
     def __repr__(self) -> typing.Literal['<Path: "<path>">']:
         return f'<Path: "{str(self)}">'
     
+
+class Report:
+    def __init__(self, status: str, error: list[Email]=[]):
+        self.status = status
+        self.error = error
+
+    
+    def __str__(self):
+        return self.status
+    
+
+    def __len__(self) -> int:
+        return len(self.error)

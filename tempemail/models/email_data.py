@@ -20,4 +20,6 @@ class Email:
             sender.encode()
             +"".join(destination).encode()
             +str(date).encode()
+            +str(subject).encode()
+            +str(content).encode()
         ).hexdigest() if date and sender else None

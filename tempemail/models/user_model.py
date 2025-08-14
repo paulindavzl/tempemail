@@ -7,41 +7,42 @@ from ..core.env_handler import EnvHandler
 from ..core.messeger import DEFAULT_NAME
 
 
-_ENV: EnvHandler
-
-
 _LETTERS = list(string.ascii_letters)
 _NUMBERS = list(string.digits)
 _CHARS = _LETTERS + _NUMBERS
 
 
 class UserModel:
-    __slots__ = ["name", "email"]
+    __slots__ = ["temp_name", "temp_email", "_env"]
 
-    def __init__(self, env: str|EnvHandler, name: Optional[str]=None, email: Optional[str]=None):
+    temp_email: str
+    temp_name: str
+    _env: EnvHandler
+
+    def __init__(self, env: EnvHandler, name: Optional[str]=None, email: Optional[str]=None):
         """
         modelo do usuário.
 
         ### parâmetros:
 
-            env (str|EnvHandler): caminho para o arquivo ou instância do manipulador de variáveis de ambiente
+            env (EnvHandler): instância do manipulador de variáveis de ambiente
             name (Optional[str]): nome do usuário
             email (Optional[str]): e-mail do usuário
         """
-        _ENV = EnvHandler.unique(env) if isinstance(env, str) else env
 
+        self._env = env
         self.temp_name = name if name is not None else self._gen_anonymous_name()
         self.temp_email = email if email is not None else self._get_email()
 
 
     def _get_email(self) -> str:
-        email = f"{self.temp_name}@{_ENV.SERVER}.com"
+        email = f"{self.temp_name}@{self._env.SERVER}.com"
 
         return email
     
 
     def _gen_anonymous_name(name: str=DEFAULT_NAME, add_time: bool=True, ranger: int=10) -> str:
-        name += "_"
+        name = DEFAULT_NAME + "_"
         for _ in range(ranger):
             name += str(rd.choice(_CHARS))
 
