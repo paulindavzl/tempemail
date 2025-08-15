@@ -47,11 +47,7 @@ class EnvHandler:
 
     """
 
-    __instance__: dict[str, "EnvHandler"]
-    __expecteds__: dict[str, dict[Literal["rule", "default"]]] = {
-        "SERVER": {"rule": _REQUIRED, "default": None}, 
-        "PORT": {"rule": _REQUIRED, "default": None}
-    }
+    __instance__: dict[str, "EnvHandler"] = {}
 
     SERVER: str
     PORT: str
@@ -64,8 +60,14 @@ class EnvHandler:
 
             envfile (str): localização do arquivo ".env" (diferentes envfiles retornam instâncias diferentes)
         """
-        self._envfile = envfile
+        self.__expecteds__: dict[str, dict[Literal["rule", "default"]]] = {
+            "SERVER": {"rule": _REQUIRED, "default": None}, 
+            "PORT": {"rule": _REQUIRED, "default": None}
+        }
+        self._envfile = str(envfile)
         self.set_default(exists_ok=True, reload=False)
+
+        self._set_unique_instance(str(envfile), self)
 
 
     def get_all_variables(self):
@@ -89,12 +91,13 @@ class EnvHandler:
             print(env.TOKEN) # "my_token_123"
         """
         envs = {}
-        with open(self._envfile, "w") as envfile:
+        with open(self._envfile, "r") as envfile:
             envfile_content = envfile.readlines()
 
             for line in envfile_content:
-                line_splited = line.split("=")
-                envs[line_splited[0]] = line_splited[1].replace("'", "").strip()
+                if len(line) >= 3 and "=" in line:
+                    line_splited = line.split("=")
+                    envs[line_splited[0]] = line_splited[1].replace("'", "").strip()
 
         self.set_env(**envs)
 
@@ -130,13 +133,14 @@ class EnvHandler:
             setattr(self, envname, value)
 
 
-    def set_env(self, reload: bool=True, **envdata: str|dict[Literal["value", "rule"], Literal["common", "required"]]):
+    def set_env(self, reload: bool=True, setteds_ok: bool=True, **envdata: str|dict[Literal["value", "rule"], Literal["common", "required"]]):
         """
         define quais variáveis de ambiente serão carregadas e define/altera o valor delas no arquivo "*.env".
 
         ### parâmetros:
 
             reload (bool): define se recarrega automaticamente ao adicionar as variáveis
+            setteds_ok (bool): caso True, se uma variável já estiver carregada, suas regras não são alteradas
             envdata (dict[str, str|dict[Literal["value", "rule"], Literal["common", "required"]]]): informações da variável que será definida
 
         ### uso:
@@ -162,7 +166,7 @@ class EnvHandler:
                 rule = value["rule"]
                 value = value["value"]
 
-            if envname not in self.__expecteds__:
+            if envname not in self.__expecteds__ or not setteds_ok:
                 self.__expecteds__[envname] = {"rule": _REQUIRED, "default": None} if rule == "required" else {"rule": _COMMON, "default": value}
 
             dotenv.set_key(self._envfile, envname, str(value))
@@ -210,6 +214,17 @@ class EnvHandler:
 
 
     @classmethod
+    def _set_unique_instance(cls, envfile: str, instance: "EnvHandler"):
+        if not cls.__instance__:
+            if envfile is None:
+                raise EmptyEnvfileException(EMPTY_ENVFILE)
+            cls.__instance__ = {envfile: instance}
+            return
+        
+        cls.__instance__[envfile] = instance
+
+
+    @classmethod
     def unique(cls, envfile: Optional[str]=None) -> "EnvHandler":
         """
         retorna uma instância única e global de EnvHandler.
@@ -226,14 +241,7 @@ class EnvHandler:
 
             - caso envfile não for informado, qualquer instância será retornada e se não houver instância, um erro será gerado.
         """
-        if not hasattr(cls, "__instance__"):
-            if envfile is None:
-                raise EmptyEnvfileException(EMPTY_ENVFILE)
-            instance = cls(envfile)
-            cls.__instance__ = {envfile: instance}
-
-            return instance
-        
+                
         if envfile is None:
             keys = list(cls.__instance__.keys())
             first_key = keys[0]
@@ -247,8 +255,14 @@ class EnvHandler:
             instance = cls(envfile)
             cls.__instance__[envfile] = instance
 
+        cls._set_unique_instance(envfile, instance)
+
         return instance
         
         
     def __str__(self):
         return self._envfile
+    
+
+    def __repr__(self):
+        return f"<EnvHandler: {self._envfile}>"
