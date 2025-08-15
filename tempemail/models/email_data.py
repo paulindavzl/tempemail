@@ -16,10 +16,14 @@ class Email:
         self.date = date
         self.attachments = attachments or {}
 
+        self.gen_rid()
+        
+
+    def gen_rid(self):
         self.rid = hashlib.sha256(
-            sender.encode()
-            +"".join(destination).encode()
-            +str(date).encode()
-            +str(subject).encode()
-            +str(content).encode()
-        ).hexdigest() if date and sender else None
+            self.sender.encode()
+            +"".join(self.destination).encode()
+            +str(self.date).encode()
+            +str(self.subject).encode()
+            +str(self.content).encode()
+        ).hexdigest() if self.date and self.sender else None

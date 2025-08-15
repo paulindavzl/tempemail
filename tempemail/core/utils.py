@@ -76,7 +76,6 @@ def get_email_hash(email: "Email") -> str:
 
     if email.date:
         content.append(str(email.date).strip().lower())
-    print(content)
     sha = hashlib.sha256(str("".join(content)).encode()).hexdigest()
 
     return sha

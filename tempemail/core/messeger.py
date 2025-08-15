@@ -14,6 +14,7 @@ EMPTY_ENVFILE = "envfile not provided (None)! Please provide an envfile."
 STATUS_250 = "250 FULL-SUCCESSFUL"
 STATUS_200 = "200 OK"
 STATUS_500 = "500 REFUSED"
+PATH_EXISTS = "A <TYPE> named <NAME> already exists! Use another name."
 
 _METADATA_SCHEME_JSON = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

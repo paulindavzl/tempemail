@@ -232,7 +232,7 @@ class EmailHandler:
         handler["From"] = email_data.sender 
         handler["To"] = email_data.destination
         handler["Subject"] = email_data.subject
-        handler["Date"] = formatdate(localtime=True)
+        handler["Date"] = email_data.date
         handler.set_content(email_data.content)
 
         return handler
@@ -279,6 +279,8 @@ class EmailHandler:
         
         def _send(email: Email):
             try:
+                email.date = formatdate(localtime=True)
+                email.gen_rid()
                 handler = self._get_handler(email)
 
                 if email.attachments:

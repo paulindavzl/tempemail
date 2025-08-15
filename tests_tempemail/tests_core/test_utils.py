@@ -1,11 +1,14 @@
 import os
 import re
+import json
 from io import TextIOWrapper
 
 from tempemail.core.utils import *
+from tempemail.core.utils import get_email_hash
 from tempemail.core.messeger import PATH_NOT_FOUND
+from tempemail import EmailHandler, EnvHandler, Email
 
-from tests_tempemail.conftest import compare, create_structure_path
+from tests_tempemail.conftest import compare, create_structure_path, configure_env
 
 
 def test__parse_message():
@@ -13,6 +16,85 @@ def test__parse_message():
 
     assert parse_message(PATH_NOT_FOUND, PATH="./file.txt", TYPE="file") == "the file ./file.txt was not found!"
     assert parse_message(PATH_NOT_FOUND, PATH="./file.txt", TYPE="directory") == "the directory ./file.txt was not found!"
+
+
+def test__get_email_hash(test_env: Path, data_to_tests: Path):
+    configure_env(test_env)
+
+    emails = data_to_tests.join("emails")
+    handler = EmailHandler(EnvHandler.unique(str(test_env)))
+    handler.save_in(emails)
+
+    email = Email(
+        destination="dest@localhost.com",
+        sender="send@localhost.com",
+        subject="Test Subject",
+        content="test content."
+    )
+
+    with handler:
+        handler.send(email)
+
+    metadata_path = emails.join("dest_localhost.com", "Test_Subject", "metadata.json")
+
+    assert metadata_path.exists
+
+    metadata: dict
+    with metadata_path.file() as meta:
+        metadata = json.load(meta)
+
+    email_hash = metadata["hash"]
+
+    assert get_email_hash(email) == email_hash
+
+    email.content = ""
+    assert get_email_hash(email) != email_hash
+
+
+def test__get_email_from(test_env: Path, data_to_tests: Path):
+    configure_env(test_env)
+
+    emails = data_to_tests.join("emails")
+    handler = EmailHandler(EnvHandler.unique(str(test_env)))
+    handler.save_in(emails)
+
+    email = Email(
+        destination="dest@localhost.com",
+        sender="send@localhost.com",
+        subject="Test Subject",
+        content="test content."
+    )
+
+    with handler:
+        handler.send(email)
+
+    subject_path = emails.join("dest_localhost.com", "Test_Subject")
+    rec_email = get_email_from(subject_path)
+
+    assert email.content == rec_email.content
+    assert email.rid == rec_email.rid
+
+
+def test__is_valid_email_in(test_env: Path, data_to_tests: Path):
+    configure_env(test_env)
+
+    emails = data_to_tests.join("emails")
+    handler = EmailHandler(EnvHandler.unique(str(test_env)))
+    handler.save_in(emails)
+
+    email = Email(
+        destination="dest@localhost.com",
+        sender="send@localhost.com",
+        subject="Test Subject",
+        content="test content."
+    )
+
+    with handler:
+        handler.send(email)
+
+    subject_path = emails.join("dest_localhost.com", "Test_Subject")
+
+    assert is_valid_email_in(subject_path)
 
 
 def test__path():
@@ -194,6 +276,19 @@ def test__path__remove__with__ignore(data_to_tests: Path):
 
         for item in comp.items():
             assert item.name in ["directory1", "file2.txt"]
+
+
+def test__path__rename(data_to_tests: Path):
+    root = data_to_tests.join("root")
+    create_structure_path(root)
+
+    main = root.join("example_structure_path", "file1.txt")
+    assert main.exists
+
+    main.rename("renamed.txt")
+
+    assert main.exists
+    assert main.name == "renamed.txt"
 
 
 def test__path__name(data_to_tests: Path):
