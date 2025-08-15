@@ -15,7 +15,8 @@ from .messeger import (
     NOT_FILE,
     DIRECTORY_ALREADY_EXISTS,
     INVALID_EMAIL,
-    _METADATA_SCHEME_JSON
+    _METADATA_SCHEME_JSON,
+    PATH_EXISTS
 )
 
 
@@ -29,7 +30,7 @@ __all__ = [
     "Path",
     "is_valid_email_in",
     "parse_message",
-    "get_email_from"
+    "get_email_from",
 ]
 
 def parse_message(message: str, complement: typing.Optional[str]=None, **replace: str) -> str:
@@ -66,13 +67,17 @@ def get_email_hash(email: "Email") -> str:
     """
     USO INTERNO
     """
-    sha = hashlib.sha256(str("".join([
-        email.subject.strip().lower(),
-        email.content.strip().lower(),
-        email.sender.strip().lower(),
-        str(email.destination).strip().lower(),
-        email.date.strip().lower()
-    ])).encode()).hexdigest()
+    content = [
+        str(email.subject).strip().lower(),
+        str(email.content).strip().lower(),
+        str(email.sender).strip().lower(),
+        str(email.destination if isinstance(email.destination, list) else [email.destination]).strip().lower(),
+    ]
+
+    if email.date:
+        content.append(str(email.date).strip().lower())
+    print(content)
+    sha = hashlib.sha256(str("".join(content)).encode()).hexdigest()
 
     return sha
 
@@ -194,13 +199,17 @@ def is_valid_email_in(path: "Path") -> bool:
     with content_path.file() as content_file:
         content = content_file.read()
 
-    sha = hashlib.sha256(str("".join([
+    content_hash = [
         str(metadata.get("subject", "")).strip().lower(),
         content.strip().lower(),
         str(metadata.get("sender", "")).strip().lower(),
-        str(metadata.get("destination", "")).strip().lower(),
-        str(metadata.get("date", "")).strip().lower()
-    ])).encode()).hexdigest()
+        str(metadata.get("destination", "")).strip().lower()
+    ]
+
+    if metadata.get("date"):
+        content_hash.append(str(metadata["date"]).strip().lower())
+
+    sha = hashlib.sha256(str("".join(content_hash)).encode()).hexdigest()
 
     return sha == metadata["hash"]
 
@@ -629,6 +638,49 @@ class Path:
                     os.remove(str(path))
 
         _remover(self)
+
+
+    def rename(self, new_name: str):
+        """
+        renomeia o componente representado
+
+        ### parâmetros:
+
+            new_name (str): novo nome do componente (arquivo/diretório)
+
+        ### uso:
+
+            ''' exemplo de estrutura antes de Path.rename
+            ./
+                project_name/
+                    directory/
+                        directory_file.txt
+            '''
+
+            path = Path(".", "project_name", "directory", "directory_file.txt")
+
+            path.rename(new_name="file.txt")
+
+            ''' exemplo de estrutura depois de Path.rename
+            ./
+                project_name/
+                    directory/
+                        file.txt
+            '''
+        """
+        if not self.exists:
+            raise PathNotFoundException(parse_message(PATH_NOT_FOUND, TYPE="path", PATH=str(self)))
+        
+        new_path = Path(*self._paths)
+        new_path._paths[-1] = new_name
+        
+        if new_path.exists:
+            typ = new_path.is_type()
+            raise PathExistsException(parse_message(PATH_EXISTS, TYPE=typ, NAME=new_name))
+        
+        os.rename(str(self), str(new_path))
+
+        self._paths = new_path._paths
 
 
     @property
