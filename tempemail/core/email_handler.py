@@ -457,7 +457,7 @@ class EmailHandler:
         elif not isinstance(extension, str):
             _raiser_UTE(extension, "str", "extension")
         elif not extension.startswith("."):
-            raise InvalidExtensionException(INVALID_EXTENSION)
+            raise UnexpectedValueException(INVALID_EXTENSION)
         path.mkdir(True)
         self.path = path
         self._handler.path = path

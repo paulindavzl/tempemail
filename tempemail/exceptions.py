@@ -46,5 +46,5 @@ class UnexpectedTypeException(TempEmailBaseExceptions):
     """tipo do valor inesperado em um parâmetro"""
 
 
-class InvalidExtensionException(TempEmailBaseExceptions):
-    """extensão inválida"""
+class UnexpectedValueException(TempEmailBaseExceptions):
+    """valor de um parâmetro inesperado"""
