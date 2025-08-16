@@ -2,10 +2,10 @@ WAIT_EMAIL_COOLDOWN = 0.2
 DEFAULT_NAME = "anonymous"
 MISSING_VARIABLE = "the <NAME> variable does not exist! <COMPLEMENT>"
 PATH_NOT_FOUND = "the <TYPE> <PATH> was not found! <COMPLEMENT>"
-PATH_ARE_NOT_DEFINED = "the path to save emails is not defined! use Receiver().save_in(...) to define a path."
+PATH_ARE_NOT_DEFINED = "the path to save emails is not defined! use EmailHandler.save_in(...) to define a path."
 NOT_DIRECTORY = "the path <PATH> does not point to a directory! <COMPLEMENT>"
 NOT_FILE = "the path <PATH> does not point to a file! <COMPLEMENT>"
-RECEIVER_OFF = """can't <OBJECTIVE> emails with receiver turned off! Use "with Handler() ..." to enable receiver."""
+RECEIVER_OFF = """can't <OBJECTIVE> emails with receiver turned off! Use "with EmailHandler()" or "EmailHandler.open()" to enable receiver."""
 DIRECTORY_ALREADY_EXISTS= "the directory in <PATH> already exists! <COMPLEMENT>"
 INVALID_EMAIL = f'the email in "<PATH>" is invalid! <COMPLEMENT>'
 TESTS_INTERRUPTED = "tests interrupted by user!"
@@ -15,6 +15,9 @@ STATUS_250 = "250 FULL-SUCCESSFUL"
 STATUS_200 = "200 OK"
 STATUS_500 = "500 REFUSED"
 PATH_EXISTS = "A <TYPE> named <NAME> already exists! Use another name."
+TIMEOUT = "the <TIME> second cooldown timed out!"
+UNEXPECTED_TYPE = "<METHOD> expected an <EXPECTED> in the <PARAMETER> parameter, but received a <RECEIVED>!"
+INVALID_EXTENSION = 'the extension must start with "."!'
 
 _METADATA_SCHEME_JSON = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

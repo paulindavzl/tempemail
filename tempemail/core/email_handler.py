@@ -30,19 +30,24 @@ from .messeger import (
     PATH_NOT_FOUND,
     STATUS_250,
     STATUS_200,
-    STATUS_500
+    STATUS_500,
+    TIMEOUT,
+    UNEXPECTED_TYPE,
+    INVALID_EXTENSION
 )
 
 
 class _Handler:
-    __slots__ = ["emails", "handler"]
+    __slots__ = ["emails", "path", "extension"]
 
     emails: list[Email]
-    handler: "EmailHandler"
+    path: Optional[Path]
+    extension: str
 
-    def __init__(self, handler: "EmailHandler"):
+    def __init__(self):
         self.emails = []
-        self.handler = handler
+        self.path = None
+        self.extension = ".txt"
 
 
     async def handle_DATA(self, server, session, envelope: Envelope):
@@ -75,26 +80,26 @@ class _Handler:
             receiver.content = payload.decode().strip()
 
         self.emails.append(receiver)
-        if self.handler.path is not None:
-            self._save(receiver)
+        if self.path is not None:
+            self.save(receiver)
 
         return "250 OK"
     
 
-    def _save(self, email: Email):
-        if not self.handler.path:
-            raise ValueError(PATH_ARE_NOT_DEFINED)
+    def save(self, email: Email):
+        if not self.path:
+            raise PathNotFoundException(PATH_ARE_NOT_DEFINED)
                 
-        self.handler.path.mkdir(True)
+        self.path.mkdir(True)
 
-        email_path = self.handler.path.join("".join(email.destination))
+        email_path = self.path.join("".join(email.destination))
         email_path.parser(in_self=True, full=False)
         email_path.mkdir(True)
 
         subject_path = email_path.free_name(email.subject, parser=True)
         subject_path.mkdir(True)
 
-        content_path = subject_path.join("content" + self.handler.extension)
+        content_path = subject_path.join("content" + self.extension)
         with content_path.file("w", True) as content_file:
             content_file.write(email.content)
 
@@ -105,7 +110,7 @@ class _Handler:
             "date": email.date,
             "rid": email.rid,
             "content_length": len(email.content.strip()),
-            "extension": self.handler.extension,
+            "extension": self.extension,
             "hash": get_email_hash(email)
         }
 
@@ -167,7 +172,7 @@ class EmailHandler:
     _controller: Controller
     _receiver_running: bool
     path: Optional[Path]
-    extension: Optional[str]
+    extension: str
     _env: EnvHandler
 
 
@@ -178,9 +183,17 @@ class EmailHandler:
         ### parâmetros:
 
             env (EnvHandler): instância do manipulador de variáveis de ambiente
-        """  
+        """
+        if not isinstance(env, EnvHandler):
+            raise UnexpectedTypeException(parse_message(
+                UNEXPECTED_TYPE,
+                METHOD="EmailHandler(...)",
+                EXPECTED="EnvHandler",
+                PARAMETER="env",
+                RECEIVED=f"{type(env).__name__} ({env})"
+            ))
         self.path = None
-        self._handler = _Handler(self)
+        self._handler = _Handler()
         self._controller = Controller(self._handler, env.SERVER, env.PORT)
         self._receiver_running = False
         self.extension = ".txt"
@@ -197,7 +210,7 @@ class EmailHandler:
 
     async def _get_emails(self, rids: list[str], timeout: Optional[float]=None, raiser: bool=True) -> None|list[Email]:
         if not self._receiver_running:
-            raise RuntimeError(parse_message(RECEIVER_OFF, OBJECTIVE="get"))
+            raise ReceiverOFFException(parse_message(RECEIVER_OFF, OBJECTIVE="get"))
         
         response = []
         rid_founds = rids.copy()
@@ -221,9 +234,9 @@ class EmailHandler:
         try:
             emails = await asyncio.wait_for(_getter(), timeout=timeout)
             return emails
-        except asyncio.TimeoutError as tm_err:
+        except asyncio.TimeoutError:
             if raiser:
-                raise tm_err
+                raise TimeoutException(parse_message(TIMEOUT, TIME=timeout))
             
 
     def _get_handler(self, email_data: Email) -> EmailMessage:
@@ -260,14 +273,13 @@ class EmailHandler:
                     )
             
 
-    def send(self, email_data: Email|list[Email], timeout: Optional[float]=None) -> Report:
+    def send(self, email_data: Email|list[Email]) -> Report:
         """
         método responsável por enviar e-mails
 
         ### parâmetros:
 
             email_data (Email|list[Email]): instância da classe `Email`, que agrupa informações de um e-mail (tanto de enviados como de recebidos)
-            timeout (Optional[float]): tempo máximo de espera até enviar um e-mail
 
         ### uso:
 
@@ -276,6 +288,17 @@ class EmailHandler:
             handler = EmailHandler(env_handler)
             handler.send(email)
         """
+        def _raiser_UTE(e):
+            if not isinstance(e, Email):
+                raise UnexpectedTypeException(parse_message(
+                    UNEXPECTED_TYPE, 
+                    METHOD="EmailHandler.send(...)",
+                    EXPECTED="Email|list[Email]",
+                    PARAMETER="email_data",
+                    RECEIVED=f"{type(e).__name__} ({e})"
+                ))
+        
+        [_raiser_UTE(e) for e in email_data] if isinstance(email_data, list) else _raiser_UTE(email_data)
         
         def _send(email: Email):
             try:
@@ -326,8 +349,8 @@ class EmailHandler:
          
             address (str|None): endereço de e-mail que será usado como base para filtrar os e-mails recebidos (quando None retorna todos os e-mails obtidos)
             repeat: (int|None): quantidade de vezes que o receptor irá receber e-mails antes de parar (quando None não possui limites)
-            timeout (float|None): tempo máximo de espera até receber um e-mail (quando None não possui tempo máximo)
-            raiser (bool): se True levanta um erro - TimeoutError - quando timeout é excedido sem receber nenhum e-mail
+            timeout (float|None): tempo máximo - em segundos - de espera até receber um e-mail (quando None não possui tempo máximo)
+            raiser (bool): se True levanta um erro - TimeoutException - quando timeout é excedido sem receber nenhum e-mail
 
         ### uso:
 
@@ -345,9 +368,22 @@ class EmailHandler:
                 emails = handler.wait_emails(address="destination@example.com", ...)       
   
         """
-
-        if not self._receiver_running:
-            raise RuntimeError(parse_message(RECEIVER_OFF, OBJECTIVE="wait"))
+        def _raiser_UTE(i, e, p):
+            raise UnexpectedTypeException(parse_message(
+                UNEXPECTED_TYPE,
+                METHOD="EmailHandler.wait_emails(...)",
+                EXPECTED=e,
+                PARAMETER=p,
+                RECEIVED=f"{type(i)} ({i})"
+            ))
+        if address and not isinstance(address, str):
+            _raiser_UTE(address, "str", "address")
+        elif repeat and not isinstance(repeat, int):
+            _raiser_UTE(repeat, "int", "repeat")
+        elif timeout and not isinstance(timeout, (float, int)):
+            _raiser_UTE(timeout, "float", "timeout")
+        elif not self._receiver_running:
+            raise ReceiverOFFException(parse_message(RECEIVER_OFF, OBJECTIVE="wait"))
         
         rid_founds = []
 
@@ -408,9 +444,25 @@ class EmailHandler:
             os pontos especias, como "@", "/", "-", etc, são convertidos em "_"
             
         """
+        def _raiser_UTE(i, e, p):
+            raise UnexpectedTypeException(parse_message(
+                UNEXPECTED_TYPE,
+                METHOD="EmailHandler.save_in(...)",
+                EXPECTED=e,
+                PARAMETER=p,
+                RECEIVED=f"{type(i)} ({i})"
+            ))
+        if not isinstance(path, Path):
+            _raiser_UTE(path, "Path", "path")
+        elif not isinstance(extension, str):
+            _raiser_UTE(extension, "str", "extension")
+        elif not extension.startswith("."):
+            raise InvalidExtensionException(INVALID_EXTENSION)
+        path.mkdir(True)
         self.path = path
-        self.path.mkdir(True)
+        self._handler.path = path
         self.extension = str(extension).lower()
+        self._handler.extension = str(extension).lower()
 
     
     def open(self):
@@ -491,7 +543,6 @@ class EmailHandler:
     def __repr__(self):
         receiver = "on" if self._receiver_running else "off"
         return f"<EmailHandler receiver={receiver} save={"off" if not self.path else str(self.path)} extension={self.extension} env={self._env}>"
-
 
 
 __all__ = ["EmailHandler"]

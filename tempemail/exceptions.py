@@ -1,30 +1,50 @@
-class PathNotFoundException(Exception):
-    """arquivo não encontrado"""
+class TempEmailBaseExceptions(BaseException):
+    '''base para todas as exceções da biblioteca "tempemail"'''
 
 
-class InvalidEmailException(Exception):
+class PathNotFoundException(TempEmailBaseExceptions):
+    """caminho não encontrado"""
+
+
+class InvalidEmailException(TempEmailBaseExceptions):
     """e-mail inválido"""
 
 
-class InvalidContentException(Exception):
+class InvalidContentException(TempEmailBaseExceptions):
     """conteúdo inválido"""
 
 
-class EnvironmentVariableRequiredException(Exception):
+class EnvironmentVariableRequiredException(TempEmailBaseExceptions):
     """variável de ambiente obrigatória ausente"""
 
 
-class EmptyEnvfileException(Exception):
+class EmptyEnvfileException(TempEmailBaseExceptions):
     """parâmetro envfile vazio (None)"""
 
 
-class NotFileException(Exception):
+class NotFileException(TempEmailBaseExceptions):
     """o caminho não leva à um arquivo"""
 
 
-class NotDirectoryException(Exception):
+class NotDirectoryException(TempEmailBaseExceptions):
     """o caminho não leva à um diretório"""
 
 
-class PathExistsException(Exception):
+class PathExistsException(TempEmailBaseExceptions):
     """o caminho já existe"""
+
+
+class ReceiverOFFException(TempEmailBaseExceptions):
+    """receptor de e-mails desativado"""
+
+
+class TimeoutException(TempEmailBaseExceptions):
+    """tempo de espera expirado"""
+
+
+class UnexpectedTypeException(TempEmailBaseExceptions):
+    """tipo do valor inesperado em um parâmetro"""
+
+
+class InvalidExtensionException(TempEmailBaseExceptions):
+    """extensão inválida"""
