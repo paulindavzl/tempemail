@@ -40,7 +40,7 @@ def test_env(data_to_tests: Path) -> Path:
 
 
 def configure_env(test_env: Path):
-    env = EnvHandler.unique(str(test_env))
+    env = EnvHandler.unique(test_env)
     env.set_env(
         SERVER="localhost",
         PORT=1025

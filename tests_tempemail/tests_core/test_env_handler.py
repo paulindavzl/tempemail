@@ -17,7 +17,7 @@ TEST='test'
 @pytest.fixture
 def env(test_env: Path):
     configure_env(test_env)
-    _e = EnvHandler(str(test_env))
+    _e = EnvHandler(test_env)
     _e.load()
     return _e
 
@@ -104,12 +104,12 @@ def test__env_handler__set_default(env: EnvHandler):
 def test__env_handler__unique(env: EnvHandler, test_env: Path, data_to_tests: Path):
     other_path = data_to_tests.join("other.env")
     gen_env(other_path)
-    other_env = EnvHandler(str(other_path))
+    other_env = EnvHandler(other_path)
 
     assert env != other_env
 
-    env_unique = EnvHandler.unique(str(test_env))
-    other_env_unique = EnvHandler.unique(str(other_path))
+    env_unique = EnvHandler.unique(test_env)
+    other_env_unique = EnvHandler.unique(other_path)
 
     assert env == env_unique
     assert other_env == other_env_unique

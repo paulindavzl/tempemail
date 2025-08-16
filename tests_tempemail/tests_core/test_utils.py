@@ -22,7 +22,7 @@ def test__get_email_hash(test_env: Path, data_to_tests: Path):
     configure_env(test_env)
 
     emails = data_to_tests.join("emails")
-    handler = EmailHandler(EnvHandler.unique(str(test_env)))
+    handler = EmailHandler(EnvHandler.unique(test_env))
     handler.save_in(emails)
 
     email = Email(
@@ -55,7 +55,7 @@ def test__get_email_from(test_env: Path, data_to_tests: Path):
     configure_env(test_env)
 
     emails = data_to_tests.join("emails")
-    handler = EmailHandler(EnvHandler.unique(str(test_env)))
+    handler = EmailHandler(EnvHandler.unique(test_env))
     handler.save_in(emails)
 
     email = Email(
@@ -79,7 +79,7 @@ def test__is_valid_email_in(test_env: Path, data_to_tests: Path):
     configure_env(test_env)
 
     emails = data_to_tests.join("emails")
-    handler = EmailHandler(EnvHandler.unique(str(test_env)))
+    handler = EmailHandler(EnvHandler.unique(test_env))
     handler.save_in(emails)
 
     email = Email(

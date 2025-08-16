@@ -18,6 +18,7 @@ PATH_EXISTS = "A <TYPE> named <NAME> already exists! Use another name."
 TIMEOUT = "the <TIME> second cooldown timed out!"
 UNEXPECTED_TYPE = "<METHOD> expected an <EXPECTED> in the <PARAMETER> parameter, but received a <RECEIVED>!"
 INVALID_EXTENSION = 'the extension must start with "."!'
+UNEXPECTED_RULE = 'rules for environment variables must be "required" or "common"! rule: <RULE>.'
 
 _METADATA_SCHEME_JSON = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

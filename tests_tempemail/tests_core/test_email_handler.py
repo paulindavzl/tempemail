@@ -12,12 +12,12 @@ def user(env: EnvHandler) -> UserModel:
 
 @pytest.fixture
 def env(test_env: Path) -> EnvHandler:
-    return EnvHandler.unique(str(test_env))
+    return EnvHandler.unique(test_env)
 
 
 @pytest.fixture
-def handler(env: EnvHandler) -> EmailHandler:
-    configure_env(str(env))
+def handler(env: EnvHandler, test_env: Path) -> EmailHandler:
+    configure_env(test_env)
     return EmailHandler(env)
 
 

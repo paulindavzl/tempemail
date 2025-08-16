@@ -2,17 +2,20 @@ import os
 import dotenv 
 from typing import TypeAlias, Literal, Optional
 
-from . import utils
-from ..exceptions import EnvironmentVariableRequiredException, EmptyEnvfileException
+from .utils import parse_message, Path
+from ..exceptions import *
 from .messeger import (
     MISSING_VARIABLE, 
-    EMPTY_ENVFILE
+    EMPTY_ENVFILE,
+    UNEXPECTED_TYPE,
+    UNEXPECTED_RULE
 )
 
 _REQUIRED: TypeAlias = Literal["__REQUIRED__"]
 _COMMON: TypeAlias = Literal["__COMMON__"]
 
 
+_DEFAULT_PATH = Path(".env")
 class EnvHandler:
     """
     classe responsável por manipular variáveis de ambientes.
@@ -28,14 +31,13 @@ class EnvHandler:
         def set_default(self, exists_ok: bool=True, reload: bool=True): define todas as variáveis para os valores padrões
 
         @classmethod
-        def unique(cls, envfile: str=".env") -> EnvHandler: retorna uma instância única e global de EnvHandler
+        def unique(cls, envpath: str=".env") -> EnvHandler: retorna uma instância única e global de EnvHandler
 
     ### uso básico:
 
-        env = EnvHandler.unique(envfile="my_envfile.env") # obtém uma instância única da classe EnvHandler
+        path = Path("my_envpath.env")
+        env = EnvHandler.unique(envpath=path) # obtém uma instância única da classe EnvHandler
         env.load() # carrega/recarrega as variáveis de ambiente
-
-        print(env.HOST) # "localhost" (valor padrão)
 
         env.set_env(
             REQUIRED_KEY={"rule": "required", "value": "my_required_key_123"}, # define uma variável de ambiente obrigatória
@@ -52,22 +54,31 @@ class EnvHandler:
     SERVER: str
     PORT: str
 
-    def __init__(self, envfile: str=".env"):
+    def __init__(self, envpath: Path=_DEFAULT_PATH):
         """
         cria uma nova instância de EnvHandler.
 
         ### parâmetros:
 
-            envfile (str): localização do arquivo ".env" (diferentes envfiles retornam instâncias diferentes)
+            envpath (Path): localização do arquivo ".env" (diferentes envpaths retornam instâncias diferentes)
         """
+        if not isinstance(envpath, Path):
+            raise UnexpectedTypeException(parse_message(
+                UNEXPECTED_TYPE,
+                METHOD="EnvHandler(...)",
+                EXPECTED="Path",
+                PARAMETER="envpath",
+                RECEIVED=f"{type(envpath).__name__} ({envpath})"
+            ))
+        
         self.__expecteds__: dict[str, dict[Literal["rule", "default"]]] = {
             "SERVER": {"rule": _REQUIRED, "default": None}, 
             "PORT": {"rule": _REQUIRED, "default": None}
         }
-        self._envfile = str(envfile)
+        self._envpath = envpath
         self.set_default(exists_ok=True, reload=False)
 
-        self._set_unique_instance(str(envfile), self)
+        self._set_unique_instance(str(envpath), self)
 
 
     def get_all_variables(self):
@@ -83,7 +94,8 @@ class EnvHandler:
                 TOKEN='my_token_123'
 
 
-            env = EnvHandler.unique(envfile="my_envfile.env")
+            path = Path("my_envpath.env")
+            env = EnvHandler.unique(envpath=path)
             
             env.get_all_variables()
 
@@ -91,10 +103,10 @@ class EnvHandler:
             print(env.TOKEN) # "my_token_123"
         """
         envs = {}
-        with open(self._envfile, "r") as envfile:
-            envfile_content = envfile.readlines()
+        with self._envpath.file() as envpath:
+            envpath_content = envpath.readlines()
 
-            for line in envfile_content:
+            for line in envpath_content:
                 if len(line) >= 3 and "=" in line:
                     line_splited = line.split("=")
                     envs[line_splited[0]] = line_splited[1].replace("'", "").strip()
@@ -110,14 +122,15 @@ class EnvHandler:
 
         ### uso:
 
-            env = EnvHandler.unique(envfile="my_envfile.env")
+            path = Path("my_envpath.env")
+            env = EnvHandler.unique(envpath=path)
 
             env.load() carrega as variáveis de ambiente já pré-definidas por EnvHandler.set_env(...) ou EnvHandler.get_all_variables()
 
             print(env.VARIABLE) # "variable_value"
         """
         dotenv.load_dotenv(
-            self._envfile,
+            str(self._envpath),
             override=True
         )
 
@@ -128,7 +141,7 @@ class EnvHandler:
             value = os.getenv(envname, default)
 
             if not value and rule is _REQUIRED:
-                raise EnvironmentVariableRequiredException(utils.parse_message(MISSING_VARIABLE, NAME=envname))
+                raise EnvironmentVariableRequiredException(parse_message(MISSING_VARIABLE, NAME=envname))
             
             setattr(self, envname, value)
 
@@ -145,7 +158,8 @@ class EnvHandler:
 
         ### uso:
 
-            env = EnvHandler.unique(envfile="my_envfile.env")
+            path = Path("my_envpath.env")
+            env = EnvHandler.unique(envpath=path)
 
             env.set_env(
                 REQUIRED_KEY={"rule": "required", "value": "my_required_key_123"}, # adiciona uma variável obrigatória
@@ -164,12 +178,15 @@ class EnvHandler:
             rule = "common"
             if isinstance(value, dict):
                 rule = value["rule"]
+
+                if rule not in ["common", "required"]:
+                    raise UnexpectedValueException(parse_message(UNEXPECTED_RULE, RULE=rule))
                 value = value["value"]
 
             if envname not in self.__expecteds__ or not setteds_ok:
                 self.__expecteds__[envname] = {"rule": _REQUIRED, "default": None} if rule == "required" else {"rule": _COMMON, "default": value}
 
-            dotenv.set_key(self._envfile, envname, str(value))
+            dotenv.set_key(str(self._envpath), envname, str(value))
             
         if reload:
             self.load()
@@ -186,9 +203,10 @@ class EnvHandler:
 
         ### uso:
 
-            env = EnvHandler.unique(envfile="my_envfile.env")
+            path = Path("my_envpath.env")
+            env = EnvHandler.unique(envpath=path)
 
-            env.set_default(exists_ok=True) # caso o arquivo "my_envfile.env" não exista, ele será criado com as variáveis no valor padrão
+            env.set_default(exists_ok=True) # caso o arquivo "my_envpath.env" não exista, ele será criado com as variáveis no valor padrão
         """
         def _get_envs() -> dict:
             _envs = {}
@@ -200,8 +218,8 @@ class EnvHandler:
 
             return _envs
 
-        if not os.path.exists(self._envfile):
-            with open(self._envfile, "w"):
+        if not self._envpath.exists:
+            with self._envpath.file("w", True):
                 pass
 
             self.set_env(**_get_envs(), reload=False)
@@ -214,55 +232,62 @@ class EnvHandler:
 
 
     @classmethod
-    def _set_unique_instance(cls, envfile: str, instance: "EnvHandler"):
+    def _set_unique_instance(cls, envpath: str, instance: "EnvHandler"):
         if not cls.__instance__:
-            if envfile is None:
-                raise EmptyEnvfileException(EMPTY_ENVFILE)
-            cls.__instance__ = {envfile: instance}
+            if envpath is None:
+                raise EmptyEnvpathException(EMPTY_ENVFILE)
+            cls.__instance__ = {envpath: instance}
             return
         
-        cls.__instance__[envfile] = instance
+        cls.__instance__[str(envpath)] = instance
 
 
     @classmethod
-    def unique(cls, envfile: Optional[str]=None) -> "EnvHandler":
+    def unique(cls, envpath: Optional[Path]=None) -> "EnvHandler":
         """
         retorna uma instância única e global de EnvHandler.
 
         ### parâmetros:
 
-            envfile (str): localização do arquivo ".env" (diferentes envfiles retornam instâncias diferentes)
+            envpath (Path): localização do arquivo ".env" (diferentes envpaths retornam instâncias diferentes)
 
         ### uso:
 
-            env = EnvHandler.unique(envfile="my_envfile.env")
+            path = Path("my_envpath.env")
+            env = EnvHandler.unique(envpath=path)
 
         ### observação:
 
-            - caso envfile não for informado, qualquer instância será retornada e se não houver instância, um erro será gerado.
+            - caso envpath não for informado, qualquer instância será retornada e se não houver instância, um erro será gerado.
         """
-                
-        if envfile is None:
+        if envpath and not isinstance(envpath, Path):
+            raise UnexpectedTypeException(parse_message(
+                UNEXPECTED_TYPE,
+                METHOD="EnvHandler(...)",
+                EXPECTED="Path",
+                PARAMETER="envpath",
+                RECEIVED=f"{type(envpath)} ({envpath})"
+            ))     
+        if envpath is None:
             keys = list(cls.__instance__.keys())
             first_key = keys[0]
 
             instance = cls.__instance__[first_key]
             return instance
         
-        instance = cls.__instance__.get(envfile)
+        instance = cls.__instance__.get(str(envpath))
 
         if instance is None:
-            instance = cls(envfile)
-            cls.__instance__[envfile] = instance
+            instance = cls(envpath)
 
-        cls._set_unique_instance(envfile, instance)
+        cls._set_unique_instance(str(envpath), instance)
 
         return instance
         
         
     def __str__(self):
-        return self._envfile
+        return str(self._envpath)
     
 
     def __repr__(self):
-        return f"<EnvHandler: {self._envfile}>"
+        return f"<EnvHandler: {self._envpath}>"
