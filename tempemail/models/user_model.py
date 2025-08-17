@@ -3,13 +3,26 @@ import string
 import random as rd
 from typing import Optional
 
+from ..core.utils import parse_message
 from ..core.env_handler import EnvHandler
-from ..core.messeger import DEFAULT_NAME
+from ..exceptions import UnexpectedTypeException
+from ..core.messeger import DEFAULT_NAME, UNEXPECTED_TYPE
 
 
 _LETTERS = list(string.ascii_letters)
 _NUMBERS = list(string.digits)
 _CHARS = _LETTERS + _NUMBERS
+
+
+def _raiser_UTE(p, i, t):
+    if not isinstance(i, t):
+        raise UnexpectedTypeException(parse_message(
+            UNEXPECTED_TYPE,
+            METHOD="UserModel(...)",
+            EXPECTED=t.__name__,
+            PARAMETER=p,
+            RECEIVED=f"{type(i).__name__} ({i})"
+        ))
 
 
 class UserModel:
@@ -29,7 +42,10 @@ class UserModel:
             name (Optional[str]): nome do usuário
             email (Optional[str]): e-mail do usuário
         """
-
+        _raiser_UTE("env", env, EnvHandler)
+        if name: _raiser_UTE("name", name, str)
+        if email: _raiser_UTE("email", email, str)
+        
         self._env = env
         self.temp_name = name if name is not None else self._gen_anonymous_name()
         self.temp_email = email if email is not None else self._get_email()

@@ -16,15 +16,17 @@ from .messeger import (
     DIRECTORY_ALREADY_EXISTS,
     INVALID_EMAIL,
     _METADATA_SCHEME_JSON,
-    PATH_EXISTS
+    PATH_EXISTS,
+    UNEXPECTED_TYPE,
+    OPEN_TEXT_MODE,
+    INVALID_OPEN_TEXT_MODE,
+    UNEXPECTED_EXPECTED
 )
 
-
 _OPEN_TEXT_MODE: typing.TypeAlias = typing.Literal['r', 'rb', 'r+', 'rb+', 'w', 'wb', 'w+', 'wb+', 'a', 'ab', 'a+', 'ab+', 'x', 'xb', 'x+', 'xb+']
-METADATA: typing.TypeAlias =  dict[typing.Literal[
+METADATA: typing.TypeAlias = dict[typing.Literal[
     "subject", "sender", "destination", "date", "rid", "content_length", "extension", "hash", "attachments",
 ], str|int]
-
 
 __all__ = [
     "Path",
@@ -98,7 +100,15 @@ def get_email_from(path: "Path") -> "Email":
         print(email.subject) # "email subject name"
         print(email.sender) # "sender@exemplo.com"
     """
-    if not path.exists:
+    if not isinstance(path, Path):
+        raise UnexpectedTypeException(parse_message(
+            UNEXPECTED_TYPE,
+            METHOD="get_email_from(...)",
+            EXPECTED="Path",
+            PARAMETER="path",
+            RECEIVED=f"{type(path).__name__} ({path})"
+        ))
+    elif not path.exists:
         raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(path), TYPE="email"))
     elif not is_valid_email_in(path):
         raise InvalidEmailException(parse_message(INVALID_EMAIL, PATH=str(path)))
@@ -164,8 +174,15 @@ def is_valid_email_in(path: "Path") -> bool:
             print(f'o e-mail salvo em "{str(email_path)}" é inválido!') 
             # 'o e-mail salvo em "./project_name/emails/email_subject_name_0/" é inválido'
     """
-
-    if not path.exists:
+    if not isinstance(path, Path):
+        raise UnexpectedTypeException(parse_message(
+            UNEXPECTED_TYPE,
+            METHOD="is_valid_email_in(...)",
+            EXPECTED="Path",
+            PARAMETER="path",
+            RECEIVED=f"{type(path).__name__} ({path})"
+        ))
+    elif not path.exists:
         raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(path), TYPE="email"))
     
     meta = path.join("metadata.json")
@@ -267,7 +284,7 @@ class Path:
 
     @staticmethod
     def _parse_path(paths: str|tuple[str]) -> list[str]:
-        paths = list(paths) if isinstance(paths, (tuple, list)) else [paths]
+        paths = list(str(p) for p in paths) if isinstance(paths, (tuple, list)) else [str(paths)]
         return paths
     
 
@@ -384,10 +401,14 @@ class Path:
             with path.file("w") as file:
                 file.write("exemplo")
         """
-        if not self.exists:
+        # if mode not in _OPEN_TEXT_MODE:
+        #     raise 
+        if not mode in OPEN_TEXT_MODE:
+            raise UnexpectedValueException(parse_message(INVALID_OPEN_TEXT_MODE, MODE=mode))
+        elif not self.exists:
             if not non_existent_ok:
                 raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(self), TYPE="file"))
-        elif not os.path.isfile(str(self)):
+        elif not self.is_type("file"):
             raise NotADirectoryError(parse_message(NOT_FILE, PATH=str(self)))
         
         return open(str(self), mode)
@@ -424,10 +445,18 @@ class Path:
             for file in files:
                 print(file.name) # "file1.txt" / "file2.txt"
         """
-        if not self.exists:
+        if not isinstance(ignore, list):
+            raise UnexpectedTypeException(parse_message(
+                UNEXPECTED_TYPE,
+                METHOD="Path.items(...)",
+                EXPECTED="list",
+                PARAMETER="ignore",
+                RECEIVED=f"{type(ignore).__name__} ({ignore})"
+            ))
+        elif not self.exists:
             raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=self, TYPE="directory"))
         elif not self.is_type("directory"):
-            raise NotADirectoryError(parse_message(NOT_DIRECTORY, PATH=self))
+            raise NotDirectoryException(parse_message(NOT_DIRECTORY, PATH=self))
         
         items_name = os.listdir(str(self))
         items = []
@@ -473,7 +502,7 @@ class Path:
         if os.path.exists(str(self)):
             if exists_ok:
                 return
-            raise FileExistsError(parse_message(DIRECTORY_ALREADY_EXISTS, PATH=str(self)))
+            raise PathExistsException(parse_message(DIRECTORY_ALREADY_EXISTS, PATH=str(self)))
         
         path = ""
         for p in self._paths:
@@ -540,7 +569,9 @@ class Path:
     def is_type(self, expected: typing.Literal["directory", "file"]) -> bool: ...
 
     def is_type(self, expected: typing.Literal["directory", "file"]=None) -> bool|typing.Literal["directory", "file"]:
-        if not self.exists:
+        if expected and expected not in ["directory", "file"]:
+            raise UnexpectedValueException(parse_message(UNEXPECTED_EXPECTED, EXPECTED=expected))
+        elif not self.exists:
             if expected is None:
                 raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=str(self), TYPE="path"))
             return False
@@ -604,8 +635,17 @@ class Path:
         """
         if not self.exists and not non_existent_ok:
             raise PathNotFoundException(parse_message(PATH_NOT_FOUND, PATH=self, TYPE="path"))
-        elif ignore and self.is_type("file"):
-            raise NotDirectoryException(parse_message(NOT_DIRECTORY, complement="use ignore only when removing directories.", PATH=self))
+        elif ignore:
+            if self.is_type("file"):
+                raise NotDirectoryException(parse_message(NOT_DIRECTORY, complement="use ignore only when removing directories.", PATH=self))
+            elif not isinstance(ignore, list):
+                raise UnexpectedTypeException(parse_message(
+                    UNEXPECTED_TYPE,
+                    METHOD="Path.remove(...)",
+                    EXPECTED="list",
+                    PARAMETER="ignore",
+                    RECEIVED=f"{tupe(ignore).__name__} ({ignore})"
+                ))
         
         ignore_parsed = [
             os.path.join(*comps) if isinstance(comps, (tuple, list)) else comps for comps in ignore
@@ -671,7 +711,7 @@ class Path:
             raise PathNotFoundException(parse_message(PATH_NOT_FOUND, TYPE="path", PATH=str(self)))
         
         new_path = Path(*self._paths)
-        new_path._paths[-1] = new_name
+        new_path._paths[-1] = str(new_name)
         
         if new_path.exists:
             typ = new_path.is_type()
